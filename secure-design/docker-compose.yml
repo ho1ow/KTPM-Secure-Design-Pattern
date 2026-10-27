@@ -1,0 +1,47 @@
+name: secure-design
+
+services:
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:80"          
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+    volumes:
+      - ./keys/internal.key:/keys/internal.key:ro   
+    depends_on: [user, order]
+
+  user:
+    build: ./user-service
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MINIO_INTERNAL_HOST: minio      
+      MINIO_PUBLIC_HOST: localhost    
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: avatars
+      PRESIGN_EXPIRY_SECONDS: 300
+      INTERNAL_AUD: user-service
+    volumes:
+      - ./keys/internal.pub:/keys/internal.pub:ro   
+    depends_on: [minio]
+
+  order:
+    build: ./order-service
+    environment:
+      PORT: 3002
+      INTERNAL_AUD: order-service
+    volumes:
+      - ./keys/internal.pub:/keys/internal.pub:ro
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"        
+      - "9001:9001"       
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
